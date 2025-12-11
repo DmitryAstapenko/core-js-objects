@@ -400,33 +400,140 @@ function group(array, keySelector, valueSelector) {
  *  For more examples see unit tests.
  */
 
+const TYPE_ITEM = {
+  element: 'element',
+  id: 'id',
+  class: 'class',
+  attr: 'attr',
+  pseudoClass: 'pseudoClass',
+  pseudoElement: 'pseudoElement',
+  combinator: 'combinator',
+};
+
+class SelectorItem {
+  #value;
+
+  #type;
+
+  constructor(value, type) {
+    this.#value = value;
+    this.#type = type;
+  }
+
+  toString() {
+    switch (this.#type) {
+      case TYPE_ITEM.element:
+        return this.#value;
+      case TYPE_ITEM.id:
+        return `#${this.#value}`;
+      case TYPE_ITEM.class:
+        return `.${this.#value}`;
+      case TYPE_ITEM.attr:
+        return `[${this.#value}]`;
+      case TYPE_ITEM.pseudoClass:
+        return `:${this.#value}`;
+      case TYPE_ITEM.pseudoElement:
+        return `::${this.#value}`;
+      default:
+        return ` ${this.#value} `;
+    }
+  }
+
+  getType() {
+    return this.#type;
+  }
+
+  getWeight() {
+    return Object.keys(TYPE_ITEM).indexOf(this.#type);
+  }
+}
+
 const cssSelectorBuilder = {
-  element(/* value */) {
-    throw new Error('Not implemented');
+  items: [],
+
+  element(value) {
+    return this.addItem(value, TYPE_ITEM.element);
   },
 
-  id(/* value */) {
-    throw new Error('Not implemented');
+  id(value) {
+    return this.addItem(value, TYPE_ITEM.id);
   },
 
-  class(/* value */) {
-    throw new Error('Not implemented');
+  class(value) {
+    return this.addItem(value, TYPE_ITEM.class);
   },
 
-  attr(/* value */) {
-    throw new Error('Not implemented');
+  attr(value) {
+    return this.addItem(value, TYPE_ITEM.attr);
   },
 
-  pseudoClass(/* value */) {
-    throw new Error('Not implemented');
+  pseudoClass(value) {
+    return this.addItem(value, TYPE_ITEM.pseudoClass);
   },
 
-  pseudoElement(/* value */) {
-    throw new Error('Not implemented');
+  pseudoElement(value) {
+    return this.addItem(value, TYPE_ITEM.pseudoElement);
   },
 
-  combine(/* selector1, combinator, selector2 */) {
-    throw new Error('Not implemented');
+  combine(selector1, combinator, selector2) {
+    this.items = [
+      ...selector1.items,
+      new SelectorItem(combinator, TYPE_ITEM.combinator),
+      ...selector2.items,
+    ];
+    return this.getCopyThis();
+  },
+
+  stringify() {
+    const selector = this.items.join('');
+
+    this.items = [];
+
+    return selector;
+  },
+
+  addItem(value, type) {
+    const item = new SelectorItem(value, type);
+
+    this.checkItem(item);
+    this.items.push(item);
+
+    return this.getCopyThis();
+  },
+
+  checkItem(item) {
+    const weightLastItem = this.items.length
+      ? this.items[this.items.length - 1].getWeight()
+      : -1;
+    const weightCurrItem = item.getWeight();
+
+    if (weightCurrItem < weightLastItem) {
+      throw new Error(
+        'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element'
+      );
+    }
+
+    if (
+      (item.getType() === TYPE_ITEM.element &&
+        this.items.some((i) => i.getType() === TYPE_ITEM.element)) ||
+      (item.getType() === TYPE_ITEM.id &&
+        this.items.some((i) => i.getType() === TYPE_ITEM.id)) ||
+      (item.getType() === TYPE_ITEM.pseudoElement &&
+        this.items.some((i) => i.getType() === TYPE_ITEM.pseudoElement))
+    ) {
+      throw new Error(
+        'Element, id and pseudo-element should not occur more than one time inside the selector'
+      );
+    }
+  },
+
+  getCopyThis() {
+    const obj = { ...this };
+
+    obj.items = [...this.items];
+    this.items = [];
+
+    return obj;
   },
 };
 
